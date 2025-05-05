@@ -2,6 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from sklearn.datasets import make_classification
+from PIL import Image
+import os
+import tempfile
+import shutil
 
 # Simulated Data
 X, y = make_classification(n_samples=100, n_features=2, n_informative=1, n_redundant=0, n_classes=2, n_clusters_per_class=1, random_state=41, hypercube=False, class_sep=10)
@@ -28,6 +32,7 @@ def perceptron(X, y):
 
 m, b = perceptron(X, y)
 
+# Subplot setup
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
 # Subplot 1: Decision boundary
@@ -50,24 +55,51 @@ line_m, = ax2.plot([], [], 'b', label="m (Slope)", linewidth=2)
 line_b, = ax2.plot([], [], 'g', label="b (Intercept)", linewidth=2)
 ax2.legend()
 
+# Create a temporary directory to store frames
+temp_dir = "./tmp"
+
+# Create a list to store the filenames of saved images for later display
+saved_frames = []
+
 # Update function for animation
 def update(i):
-    # Update decision boundary in subplot 1
-    line.set_ydata(m[i] * x_i + b[i])  # Update the decision boundary based on the current epoch
-    title.set_text(f"Epoch {i + 1}")  # Update the title for the current epoch
+    line.set_ydata(m[i] * x_i + b[i])
+    title.set_text(f"Epoch {i + 1}")
+    line_m.set_data(np.arange(i+1), m[:i+1])
+    line_b.set_data(np.arange(i+1), b[:i+1])
+
+    # Save each frame to a temporary file in the temp_dir
+    plt.draw()
+    tmp_filename = os.path.join(temp_dir, f"frame_{i}.png")
+    plt.savefig(tmp_filename, bbox_inches='tight')
     
-    # Update m and b growth plots in subplot 2
-    line_m.set_data(np.arange(i+1), m[:i+1])  # Plot m (slope) evolution over time
-    line_b.set_data(np.arange(i+1), b[:i+1])  # Plot b (intercept) evolution over time
-    
+    # Append the filename to saved_frames
+    saved_frames.append(tmp_filename)
+
     return line, title, line_m, line_b
 
-# Create the animation
-anim = FuncAnimation(fig, update, frames=len(m), interval=100, repeat=False)
+# Create the animation by updating for each epoch
+for i in range(len(m)):
+    update(i)
 
-anim.save('perceptron_animation.mp4', writer='ffmpeg', fps=24)
+# Now that all frames are saved, load them into a list for the GIF creation or display
+frames = []
+for filename in saved_frames:
+    try:
+        frames.append(Image.open(filename))
+    except Exception as e:
+        print(f"Error opening frame {filename}: {e}")
 
-plt.tight_layout()  # Adjust layout to prevent overlap
+# Create the animation using the saved frames
+fig2, ax2 = plt.subplots(1, 1, figsize=(6, 6))
+
+def show_frame(i):
+    ax2.clear()  # Clear the previous frame
+    ax2.imshow(frames[i])
+    ax2.axis('off')  # Turn off axis for cleaner look
+    ax2.set_title(f"Epoch {i + 1}")
+
+# Display the animation
+ani = FuncAnimation(fig2, show_frame, frames=len(frames), interval=100, repeat=False)
 plt.show()
 
-plt.savefig()
